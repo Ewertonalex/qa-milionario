@@ -169,7 +169,7 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 
 **Ewerton Alexandre**
 - GitHub: [@Ewertonalex](https://github.com/Ewertonalex)
-- LinkedIn: [Ewerton Alexandre](https://linkedin.com/in/ewertonalex)
+- LinkedIn: [Ewerton Alexander](https://www.linkedin.com/in/ewertonalexander/)
 
 ---
 
