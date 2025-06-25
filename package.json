@@ -1,14 +1,27 @@
 {
   "name": "qa-milionario",
-  "version": "1.0.0",
-  "main": "index.js",
+  "version": "1.0.2",
+  "description": "O quiz definitivo de QA com IA, modais customizados e acessibilidade completa",
+  "author": "Ewerton Alexandre <ewerton@exemplo.com>",
+  "main": "electron-main.js",
+  "homepage": "./",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "build-web": "expo export --platform web --output-dir dist-web",
+    "electron": "electron electron-main.js",
+    "electron-dev": "ELECTRON_ENV=development electron electron-main.js",
+    "build-electron": "npm run build-web && electron-builder",
+    "build-windows": "npm run build-web && electron-builder --windows",
+    "build-mac": "npm run build-web && electron-builder --mac",
+    "build-all": "npm run build-web && electron-builder --windows --mac",
+    "dist": "npm run build-web && electron-builder --publish=never",
+    "rebuild": "npm install && npm run build-web && npm run build-electron"
   },
   "dependencies": {
+    "@expo/metro-runtime": "~4.0.1",
     "@expo/vector-icons": "^14.0.0",
     "@react-native-async-storage/async-storage": "^2.1.0",
     "expo": "~52.0.0",
@@ -18,18 +31,93 @@
     "expo-speech": "~12.0.0",
     "expo-status-bar": "~2.0.0",
     "react": "18.3.1",
+    "react-dom": "18.3.1",
     "react-native": "0.76.0",
     "react-native-animatable": "^1.4.0",
     "react-native-tts": "^4.1.0",
-    "react-dom": "18.3.1",
-    "react-native-web": "~0.19.13",
-    "@expo/metro-runtime": "~4.0.1"
+    "react-native-web": "~0.19.13"
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
     "@types/react": "~18.3.0",
     "@types/react-native": "^0.73.0",
+    "electron": "^25.9.8",
+    "electron-builder": "^24.6.4",
     "typescript": "^5.3.0"
+  },
+  "build": {
+    "appId": "com.ewertonalex.qa-milionario",
+    "productName": "QA Milionário",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "dist-web/**/*",
+      "electron-main.js",
+      "package.json",
+      "index.js",
+      "App.tsx",
+      "assets/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.education",
+      "icon": "assets/icon-512.png",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "entitlements": null,
+      "entitlementsInherit": null,
+      "darkModeSupport": false,
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "win": {
+      "icon": "assets/icon-512.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "ia32"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64",
+            "ia32"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "linux": {
+      "icon": "assets/icon-512.png",
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    }
   },
   "private": true
 }

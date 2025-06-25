@@ -1,131 +1,185 @@
-# 🎯 QA Milionário
+# 🏆 QA Milionário
 
-**O jogo do Show do Milhão para profissionais de QA!**
+<div align="center">
 
-Um aplicativo mobile educativo que testa conhecimentos em Quality Assurance através de perguntas geradas por IA, baseadas no syllabus ISTQB CTFL.
+![QA Milionário Logo](assets/icon-512.png)
 
-## 🌟 Características
+**O quiz definitivo para profissionais de QA inspirado no Show do Milhão!**
 
-### 🎮 Jogabilidade
-- **20 perguntas** com dificuldade crescente
-- **Sistema de pontuação**: 100 a 32.000 pontos
-- **3 vidas** para erros
-- **4 tipos de ajuda**: Universitários (IA), Eliminar 2, Pular, Desistir
+[![Versão](https://img.shields.io/badge/versão-1.0.2-blue.svg)](https://github.com/Ewertonalex/qa-milionario/releases)
+[![Plataforma](https://img.shields.io/badge/plataforma-Mac%20%7C%20Windows-green.svg)](#downloads)
+[![Licença](https://img.shields.io/badge/licença-MIT-yellow.svg)](LICENSE)
+[![ISTQB](https://img.shields.io/badge/ISTQB-CTFL-red.svg)](https://www.istqb.org/)
 
-### 🤖 IA Integrada
-- **Google Gemini 1.5 Flash** para gerar perguntas dinâmicas
-- **Conteúdo baseado no ISTQB CTFL**
-- **Ajuda dos Universitários** com explicações da IA
+</div>
 
-### ♿ Acessibilidade
-- **Text-to-Speech (TTS)** para leitura de perguntas
-- **Interface otimizada** para diferentes necessidades
-- **Controles de áudio** configuráveis
+## 🎯 **Sobre o Projeto**
 
-### 🎵 Experiência Sonora
-- **Sons dinâmicos** para cada ação do jogo
-- **Feedback auditivo** para respostas corretas/incorretas
-- **Controle total** do áudio pelo usuário
+O **QA Milionário** é um jogo educativo inspirado no clássico **Show do Milhão** da TV brasileira, especialmente desenvolvido para profissionais de Quality Assurance (QA). 
 
-## 🚀 Como Executar
+### 📺 **Como o Show do Milhão**
+- 🎪 **20 perguntas** progressivas com dificuldade crescente
+- 💰 **Sistema de pontuação** (R$ 1.000 até R$ 1.000.000)
+- 🆘 **Ajudas clássicas**: Universitários, Eliminar 2 alternativas, Pular pergunta
+- ❤️ **Sistema de vidas** - 3 chances para continuar
+- 🏆 **Ranking** para competir com outros jogadores
 
-### Pré-requisitos
-```bash
-node >= 16
-npm ou yarn
-Expo CLI
-```
+### 🔬 **Focado em QA**
+- 📚 **Perguntas ISTQB CTFL** (Foundation Level)
+- 🤖 **IA Gemini** gerando perguntas dinâmicas
+- 🎯 **3 níveis de dificuldade**: Básico, Intermediário, Avançado
+- 📖 **Conteúdo atualizado** com melhores práticas de QA
 
-### Instalação
-```bash
-# Clone o repositório
-git clone [seu-repositorio]
-cd qa-milionario
+## 📥 **Downloads**
 
-# Instale as dependências
-npm install
+### 🍎 **macOS (Intel)**
+[![Download para Mac](https://img.shields.io/badge/Download-macOS%20Intel-blue?style=for-the-badge&logo=apple)](https://github.com/Ewertonalex/qa-milionario/releases/download/v1.0.2/QA.Milionario-1.0.2.dmg)
 
-# Inicie o projeto
-npm start
-```
+**Tamanho:** 169MB | **Compatibilidade:** macOS 10.15+
 
-### Executar no Dispositivo
-```bash
-# Android
-npm run android
+### 🪟 **Windows**
+[![Download para Windows](https://img.shields.io/badge/Download-Windows%20x64-blue?style=for-the-badge&logo=windows)](https://github.com/Ewertonalex/qa-milionario/releases/download/v1.0.2/QA.Milionario.Setup.1.0.2.exe)
 
-# iOS
-npm run ios
-
-# Web
-npm run web
-```
-
-## 📱 Telas do App
-
-1. **Login**: Entrada com nome do jogador
-2. **Home**: Dashboard com opções e configurações
-3. **Game**: Tela principal do jogo
-4. **Result**: Resultados finais e estatísticas
-
-## 🛠 Tecnologias
-
-- **React Native** (Expo)
-- **TypeScript**
-- **Google Gemini 1.5 Flash Latest**
-- **React Native TTS**
-- **React Native Animatable**
-- **AsyncStorage**
-
-## 🎯 Conteúdo Educativo
-
-Todas as perguntas são baseadas no **ISTQB CTFL (Certified Tester Foundation Level)**, cobrindo:
-
-- Fundamentos de Teste
-- Teste ao Longo do SDLC
-- Teste Estático
-- Técnicas de Teste
-- Gerenciamento de Teste
-- Ferramentas de Teste
-
-## 🔧 Configuração da API
-
-### Google Gemini
-1. Obtenha uma API Key no [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Substitua a chave no arquivo `App.tsx`:
-```typescript
-const GEMINI_API_KEY = 'sua-api-key-aqui';
-```
-
-## 📊 Status do Projeto
-
-- ✅ **Jogabilidade completa** implementada
-- ✅ **IA Gemini** integrada
-- ✅ **Sistema de ajudas** funcional
-- ✅ **Acessibilidade** com TTS
-- ✅ **Interface responsiva**
-- ✅ **Persistência de dados**
-
-## 🎮 Como Jogar
-
-1. **Digite seu nome** na tela de login
-2. **Configure áudio/acessibilidade** se necessário
-3. **Clique em "Iniciar Jogo"**
-4. **Responda as perguntas** ou use as ajudas disponíveis
-5. **Tente chegar aos 32.000 pontos!**
-
-## 📝 Licença
-
-Este projeto é educativo e open source.
-
-## 🤝 Contribuições
-
-Contribuições são bem-vindas! Sinta-se à vontade para:
-- Reportar bugs
-- Sugerir melhorias
-- Adicionar novas funcionalidades
-- Melhorar a documentação
+**Tamanho:** 293MB | **Compatibilidade:** Windows 10+
 
 ---
 
-**Desenvolvido com ❤️ para a comunidade de QA** 
+## ✨ **Funcionalidades**
+
+### 🎮 **Gameplay Completo**
+- ✅ **20 perguntas ISTQB** profissionais
+- ✅ **Sistema de pontuação** progressiva (R$ 1.000 a R$ 1.000.000)
+- ✅ **3 níveis de dificuldade** (5 fáceis, 10 médias, 5 difíceis)
+- ✅ **Sistema de vidas** (3 vidas por jogo)
+- ✅ **Ranking local** persistente
+
+### 🆘 **Sistema de Ajudas**
+- 🎓 **Universitários** - Opinião de especialistas
+- ✂️ **Eliminar 2** - Remove duas alternativas incorretas
+- ⏭️ **Pular** - Pula a pergunta atual
+- 🚪 **Desistir** - Sai do jogo mantendo pontuação
+
+### 🤖 **Inteligência Artificial**
+- 🧠 **IA Gemini** integrada para geração dinâmica de perguntas
+- 📝 **Perguntas contextualizadas** sobre ISTQB CTFL
+- 🔄 **Conteúdo sempre atualizado**
+
+### 🎵 **Experiência Imersiva**
+- 🔊 **8 efeitos sonoros** temáticos
+- 🗣️ **Text-to-Speech** em português brasileiro
+- ♿ **Acessibilidade completa**
+- 📱 **Interface responsiva**
+
+## 🚀 **Instalação**
+
+### **macOS**
+1. Baixe o arquivo `QA Milionário-1.0.2.dmg`
+2. Duplo clique no arquivo baixado
+3. Arraste o app para a pasta **Applications**
+4. Execute o comando de segurança:
+```bash
+sudo xattr -rd com.apple.quarantine "/Applications/QA Milionário.app"
+```
+
+### **Windows**
+1. Baixe o arquivo `QA Milionário Setup 1.0.2.exe`
+2. Execute o instalador como administrador
+3. Siga as instruções de instalação
+4. Inicie o jogo pelo menu Iniciar
+
+## 🎯 **Como Jogar**
+
+### **1. Configuração Inicial**
+- Digite seu nome na tela inicial
+- Configure áudio e acessibilidade
+- Escolha suas preferências de som
+
+### **2. Gameplay**
+- Responda 20 perguntas sobre ISTQB CTFL
+- Use as ajudas estrategicamente
+- Acumule pontos progressivamente
+- Conquiste até R$ 1.000.000!
+
+### **3. Sistema de Pontuação**
+```
+Pergunta  1-5  (Fácil):      R$ 1.000 - R$ 10.000
+Pergunta  6-15 (Médio):      R$ 20.000 - R$ 500.000
+Pergunta 16-20 (Difícil):    R$ 750.000 - R$ 1.000.000
+```
+
+## 🛠 **Tecnologias**
+
+- **Framework:** React Native + Expo
+- **Desktop:** Electron 25.9.8 LTS
+- **IA:** Google Gemini API
+- **Áudio:** Expo AV + Text-to-Speech
+- **Armazenamento:** AsyncStorage
+- **Build:** Electron Builder
+
+## 📊 **Especificações Técnicas**
+
+### **Requisitos Mínimos**
+- **macOS:** 10.15 (Catalina) ou superior
+- **Windows:** 10 (64-bit) ou superior
+- **RAM:** 4GB mínimo, 8GB recomendado
+- **Espaço:** 500MB livres
+- **Internet:** Opcional (para IA Gemini)
+
+### **Arquiteturas Suportadas**
+- **macOS:** Intel x64 (Mac M1/M2 via Rosetta)
+- **Windows:** x64, x86 (32-bit)
+
+## 🤝 **Contribuição**
+
+Contribuições são bem-vindas! Para contribuir:
+
+1. Fork o projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
+3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
+4. Push para a branch (`git push origin feature/AmazingFeature`)
+5. Abra um Pull Request
+
+## 📝 **Roadmap**
+
+- [ ] **v1.1.0** - Suporte para Mac M1/M2 nativo
+- [ ] **v1.2.0** - Modo multiplayer online
+- [ ] **v1.3.0** - Banco de perguntas expandido
+- [ ] **v1.4.0** - Certificações adicionais (ISTQB Advanced)
+- [ ] **v1.5.0** - Versão mobile (iOS/Android)
+
+## 🏆 **Conquistas**
+
+- ✅ **Compatibilidade total** com Mac Intel
+- ✅ **Interface profissional** e intuitiva
+- ✅ **Performance otimizada** para desktop
+- ✅ **Funcionalidades completas** do Show do Milhão
+- ✅ **Conteúdo ISTQB** validado por especialistas
+
+## 📞 **Suporte**
+
+- 🐛 **Bugs:** [Issues](https://github.com/Ewertonalex/qa-milionario/issues)
+- 💡 **Sugestões:** [Discussions](https://github.com/Ewertonalex/qa-milionario/discussions)
+- 📧 **Contato:** ewerton@exemplo.com
+
+## 📄 **Licença**
+
+Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICENSE) para detalhes.
+
+## 👨‍💻 **Autor**
+
+**Ewerton Alexandre**
+- GitHub: [@Ewertonalex](https://github.com/Ewertonalex)
+- LinkedIn: [Ewerton Alexandre](https://linkedin.com/in/ewertonalex)
+
+---
+
+<div align="center">
+
+**🎯 Teste seus conhecimentos de QA de forma divertida!**
+
+[![Estrelas](https://img.shields.io/github/stars/Ewertonalex/qa-milionario?style=social)](https://github.com/Ewertonalex/qa-milionario/stargazers)
+[![Forks](https://img.shields.io/github/forks/Ewertonalex/qa-milionario?style=social)](https://github.com/Ewertonalex/qa-milionario/network/members)
+
+**Desenvolvido com ❤️ para a comunidade QA brasileira**
+
+</div> 
