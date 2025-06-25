@@ -1,6 +1,6 @@
 {
   "name": "qa-milionario",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "O quiz definitivo de QA com IA, modais customizados e acessibilidade completa",
   "author": "Ewerton Alexandre <ewerton@exemplo.com>",
   "main": "electron-main.js",

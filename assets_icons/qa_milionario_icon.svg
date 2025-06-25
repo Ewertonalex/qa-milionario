@@ -1,0 +1,42 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Circle -->
+  <circle cx="256" cy="256" r="256" fill="#1a1a2e"/>
+  
+  <!-- Inner Circle -->
+  <circle cx="256" cy="256" r="220" fill="#16213e" stroke="#0f3460" stroke-width="4"/>
+  
+  <!-- QA Text -->
+  <text x="256" y="200" font-family="Arial, sans-serif" font-size="120" font-weight="bold" fill="#e94560" text-anchor="middle">QA</text>
+  
+  <!-- Crown/Trophy Icon -->
+  <path d="M200 280 L220 260 L240 280 L260 260 L280 280 L300 260 L312 280 L312 320 L200 320 Z" fill="#FFD700" stroke="#FFA500" stroke-width="2"/>
+  
+  <!-- Crown Details -->
+  <circle cx="220" cy="265" r="8" fill="#FFD700"/>
+  <circle cx="256" cy="255" r="12" fill="#FFD700"/>
+  <circle cx="292" cy="265" r="8" fill="#FFD700"/>
+  
+  <!-- Base -->
+  <rect x="190" y="320" width="132" height="20" rx="10" fill="#0f3460"/>
+  
+  <!-- Milionário Text -->
+  <text x="256" y="380" font-family="Arial, sans-serif" font-size="32" font-weight="600" fill="#0f3460" text-anchor="middle">MILIONÁRIO</text>
+  
+  <!-- Bug/Check Icons (QA Theme) -->
+  <circle cx="180" cy="120" r="25" fill="#e94560" opacity="0.8"/>
+  <path d="M170 120 L178 128 L190 110" stroke="white" stroke-width="3" fill="none" stroke-linecap="round"/>
+  
+  <circle cx="332" cy="120" r="25" fill="#e94560" opacity="0.8"/>
+  <path d="M322 110 L342 130 M342 110 L322 130" stroke="white" stroke-width="3" stroke-linecap="round"/>
+  
+  <!-- Testing Icons -->
+  <circle cx="120" cy="256" r="20" fill="#0f3460" opacity="0.6"/>
+  <rect x="112" y="248" width="16" height="16" rx="2" fill="white"/>
+  
+  <circle cx="392" cy="256" r="20" fill="#0f3460" opacity="0.6"/>
+  <circle cx="392" cy="256" r="8" fill="white"/>
+  
+  <!-- Bottom decorative elements -->
+  <circle cx="150" cy="400" r="15" fill="#16213e" opacity="0.7"/>
+  <circle cx="362" cy="400" r="15" fill="#16213e" opacity="0.7"/>
+</svg> 

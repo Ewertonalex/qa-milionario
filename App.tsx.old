@@ -1,0 +1,1064 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Alert,
+  ScrollView,
+  SafeAreaView,
+  StatusBar,
+  Dimensions,
+  Modal,
+  ActivityIndicator,
+  Platform,
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Importação condicional do TTS apenas em plataformas nativas
+let Tts: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    Tts = require('react-native-tts');
+  } catch (e) {
+    console.log('TTS não disponível nesta plataforma');
+  }
+}
+
+const { width, height } = Dimensions.get('window');
+
+// Configuração da API Gemini
+const GEMINI_API_KEY = 'AIzaSyCCc8BY7EYXxY9MTAC_ZikFwdbjiw6Q8ZE';
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
+
+// Tipos
+interface Question {
+  id: number;
+  question: string;
+  options: string[];
+  correct: number;
+  difficulty: 'easy' | 'medium' | 'hard';
+  points: number;
+}
+
+interface GameState {
+  currentQuestion: number;
+  score: number;
+  lives: number;
+  questions: Question[];
+  usedHelps: {
+    universities: boolean;
+    eliminate: boolean;
+    skip: boolean;
+  };
+  gameStarted: boolean;
+  gameFinished: boolean;
+}
+
+// Serviço de Áudio
+class AudioService {
+  private static instance: AudioService;
+  private audioEnabled: boolean = true;
+
+  static getInstance(): AudioService {
+    if (!AudioService.instance) {
+      AudioService.instance = new AudioService();
+    }
+    return AudioService.instance;
+  }
+
+  setEnabled(enabled: boolean) {
+    this.audioEnabled = enabled;
+  }
+
+  isEnabled(): boolean {
+    return this.audioEnabled;
+  }
+
+  // Sons sintéticos usando beeps
+  playIntro() {
+    if (!this.audioEnabled) return;
+    console.log('🎵 Som: Intro do jogo');
+  }
+
+  playCorrect() {
+    if (!this.audioEnabled) return;
+    console.log('🎵 Som: Resposta correta');
+  }
+
+  playWrong() {
+    if (!this.audioEnabled) return;
+    console.log('🎵 Som: Resposta errada');
+  }
+
+  playLevelUp() {
+    if (!this.audioEnabled) return;
+    console.log('🎵 Som: Subida de nível');
+  }
+
+  playVictory() {
+    if (!this.audioEnabled) return;
+    console.log('🎵 Som: Vitória');
+  }
+
+  playGameOver() {
+    if (!this.audioEnabled) return;
+    console.log('🎵 Som: Game Over');
+  }
+
+  playHelp() {
+    if (!this.audioEnabled) return;
+    console.log('🎵 Som: Ajuda usada');
+  }
+
+  playSuspense() {
+    if (!this.audioEnabled) return;
+    console.log('🎵 Som: Suspense');
+  }
+}
+
+// Serviço de Acessibilidade
+class AccessibilityService {
+  private static instance: AccessibilityService;
+  private ttsEnabled: boolean = false;
+
+  static getInstance(): AccessibilityService {
+    if (!AccessibilityService.instance) {
+      AccessibilityService.instance = new AccessibilityService();
+    }
+    return AccessibilityService.instance;
+  }
+
+  async initialize() {
+    try {
+      if (Tts && Platform.OS !== 'web') {
+        await Tts.setDefaultLanguage('pt-BR');
+        await Tts.setDefaultRate(0.5);
+        await Tts.setDefaultPitch(1.0);
+      }
+    } catch (error) {
+      console.log('TTS não disponível:', error);
+    }
+  }
+
+  setEnabled(enabled: boolean) {
+    this.ttsEnabled = enabled;
+    if (enabled) {
+      this.speak('Acessibilidade ativada. O QA Milionário irá ler todas as informações.');
+    }
+  }
+
+  isEnabled(): boolean {
+    return this.ttsEnabled;
+  }
+
+  async speak(text: string) {
+    if (!this.ttsEnabled) return;
+    try {
+      if (Platform.OS === 'web') {
+        // Para web, usar SpeechSynthesis API se disponível
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = 'pt-BR';
+          utterance.rate = 0.8;
+          window.speechSynthesis.speak(utterance);
+        } else {
+          console.log('TTS Web:', text);
+        }
+      } else if (Tts) {
+        await Tts.speak(text);
+      }
+    } catch (error) {
+      console.log('Erro no TTS:', error);
+    }
+  }
+
+  async readQuestion(question: Question, questionNumber: number) {
+    if (!this.ttsEnabled) return;
+    
+    const text = `Pergunta ${questionNumber} de 20. ${question.question}. 
+    Opção A: ${question.options[0]}. 
+    Opção B: ${question.options[1]}. 
+    Opção C: ${question.options[2]}. 
+    Opção D: ${question.options[3]}.`;
+    
+    await this.speak(text);
+  }
+
+  async readResult(isCorrect: boolean, score: number) {
+    if (!this.ttsEnabled) return;
+    
+    const text = isCorrect 
+      ? `Resposta correta! Sua pontuação atual é ${score} pontos.`
+      : `Resposta incorreta. Sua pontuação atual é ${score} pontos.`;
+    
+    await this.speak(text);
+  }
+
+  async readGameStats(score: number, lives: number) {
+    if (!this.ttsEnabled) return;
+    await this.speak(`Pontuação: ${score} pontos. Vidas restantes: ${lives}.`);
+  }
+}
+
+const App: React.FC = () => {
+  // Estados
+  const [currentScreen, setCurrentScreen] = useState<'login' | 'home' | 'game' | 'result'>('login');
+  const [playerName, setPlayerName] = useState('');
+  const [gameState, setGameState] = useState<GameState>({
+    currentQuestion: 0,
+    score: 0,
+    lives: 3,
+    questions: [],
+    usedHelps: { universities: false, eliminate: false, skip: false },
+    gameStarted: false,
+    gameFinished: false,
+  });
+  const [loading, setLoading] = useState(false);
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
+  const [eliminatedOptions, setEliminatedOptions] = useState<number[]>([]);
+  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [accessibilityEnabled, setAccessibilityEnabled] = useState(false);
+
+  // Serviços
+  const audioService = useRef(AudioService.getInstance()).current;
+  const accessibilityService = useRef(AccessibilityService.getInstance()).current;
+
+  useEffect(() => {
+    initializeServices();
+    loadUserData();
+    
+    // BackHandler apenas para plataformas nativas (Android)
+    if (Platform.OS === 'android') {
+      const { BackHandler } = require('react-native');
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
+      return () => backHandler.remove();
+    }
+  }, []);
+
+  const initializeServices = async () => {
+    await accessibilityService.initialize();
+  };
+
+  const loadUserData = async () => {
+    try {
+      const name = await AsyncStorage.getItem('playerName');
+      const audioSetting = await AsyncStorage.getItem('audioEnabled');
+      const accessibilitySetting = await AsyncStorage.getItem('accessibilityEnabled');
+      
+      if (name) setPlayerName(name);
+      if (audioSetting !== null) {
+        const enabled = JSON.parse(audioSetting);
+        setAudioEnabled(enabled);
+        audioService.setEnabled(enabled);
+      }
+      if (accessibilitySetting !== null) {
+        const enabled = JSON.parse(accessibilitySetting);
+        setAccessibilityEnabled(enabled);
+        accessibilityService.setEnabled(enabled);
+      }
+    } catch (error) {
+      console.log('Erro ao carregar dados:', error);
+    }
+  };
+
+  const handleBackPress = () => {
+    if (currentScreen === 'game') {
+      Alert.alert(
+        'Sair do Jogo',
+        'Tem certeza que deseja sair? O progresso será perdido.',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Sair', onPress: () => setCurrentScreen('home') }
+        ]
+      );
+      return true;
+    }
+    return false;
+  };
+
+  // Geração de perguntas com IA
+  const generateQuestions = async (): Promise<Question[]> => {
+    setLoading(true);
+    
+    try {
+      const prompt = `Gere 20 perguntas sobre ISTQB CTFL (Certified Tester Foundation Level) em português brasileiro.
+      
+      Distribua as perguntas em 3 níveis de dificuldade:
+      - 8 perguntas fáceis (1000 pontos cada)
+      - 8 perguntas médias (2000 pontos cada) 
+      - 4 perguntas difíceis (5000 pontos cada)
+      
+      Formato JSON:
+      {
+        "questions": [
+          {
+            "question": "Pergunta aqui",
+            "options": ["A) opção", "B) opção", "C) opção", "D) opção"],
+            "correct": 0,
+            "difficulty": "easy",
+            "points": 1000
+          }
+        ]
+      }
+      
+      Tópicos ISTQB: Fundamentos de teste, Processo de teste, Técnicas de teste, Gerenciamento de teste, Ferramentas de teste.`;
+
+      const response = await fetch(GEMINI_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      });
+
+      const data = await response.json();
+      const content = data.candidates[0].content.parts[0].text;
+      
+      // Extrair JSON do conteúdo
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('Formato de resposta inválido');
+      
+      const questionsData = JSON.parse(jsonMatch[0]);
+      
+      return questionsData.questions.map((q: any, index: number) => ({
+        id: index + 1,
+        question: q.question,
+        options: q.options,
+        correct: q.correct,
+        difficulty: q.difficulty,
+        points: q.points
+      }));
+      
+    } catch (error) {
+      console.error('Erro ao gerar perguntas:', error);
+      
+      // Perguntas de fallback
+      return [
+        {
+          id: 1,
+          question: "O que é teste de software?",
+          options: ["A) Processo de encontrar defeitos", "B) Processo de validação", "C) Ambos", "D) Nenhum"],
+          correct: 2,
+          difficulty: 'easy' as const,
+          points: 1000
+        }
+        // Mais perguntas de fallback...
+      ];
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Iniciar novo jogo
+  const startNewGame = async () => {
+    audioService.playIntro();
+    await accessibilityService.speak('Iniciando novo jogo do QA Milionário!');
+    
+    const questions = await generateQuestions();
+    
+    setGameState({
+      currentQuestion: 0,
+      score: 0,
+      lives: 3,
+      questions,
+      usedHelps: { universities: false, eliminate: false, skip: false },
+      gameStarted: true,
+      gameFinished: false,
+    });
+    
+    setSelectedAnswer(null);
+    setEliminatedOptions([]);
+    setCurrentScreen('game');
+    
+    // Ler primeira pergunta
+    if (questions.length > 0) {
+      setTimeout(() => {
+        accessibilityService.readQuestion(questions[0], 1);
+      }, 1000);
+    }
+  };
+
+  // Responder pergunta
+  const answerQuestion = async (selectedIndex: number) => {
+    if (selectedAnswer !== null) return;
+    
+    setSelectedAnswer(selectedIndex);
+    audioService.playSuspense();
+    
+    const currentQ = gameState.questions[gameState.currentQuestion];
+    const isCorrect = selectedIndex === currentQ.correct;
+    
+    setTimeout(async () => {
+      if (isCorrect) {
+        audioService.playCorrect();
+        const newScore = gameState.score + currentQ.points;
+        
+        setGameState(prev => ({
+          ...prev,
+          score: newScore,
+          currentQuestion: prev.currentQuestion + 1
+        }));
+        
+        await accessibilityService.readResult(true, newScore);
+        
+        if (gameState.currentQuestion + 1 >= gameState.questions.length) {
+          // Jogo completo
+          audioService.playVictory();
+          await accessibilityService.speak(`Parabéns! Você completou o QA Milionário com ${newScore} pontos!`);
+          
+          setGameState(prev => ({ ...prev, gameFinished: true }));
+          setCurrentScreen('result');
+        } else {
+          // Próxima pergunta
+          audioService.playLevelUp();
+          setTimeout(() => {
+            setSelectedAnswer(null);
+            setEliminatedOptions([]);
+            const nextQ = gameState.questions[gameState.currentQuestion + 1];
+            accessibilityService.readQuestion(nextQ, gameState.currentQuestion + 2);
+          }, 2000);
+        }
+      } else {
+        audioService.playWrong();
+        const newLives = gameState.lives - 1;
+        
+        setGameState(prev => ({
+          ...prev,
+          lives: newLives
+        }));
+        
+        await accessibilityService.readResult(false, gameState.score);
+        
+        if (newLives <= 0) {
+          // Game Over
+          audioService.playGameOver();
+          await accessibilityService.speak(`Game Over! Sua pontuação final foi ${gameState.score} pontos.`);
+          
+          setGameState(prev => ({ ...prev, gameFinished: true }));
+          setCurrentScreen('result');
+        } else {
+          // Continuar jogo
+          setTimeout(() => {
+            setSelectedAnswer(null);
+            setEliminatedOptions([]);
+            const nextQ = gameState.questions[gameState.currentQuestion + 1];
+            accessibilityService.readQuestion(nextQ, gameState.currentQuestion + 2);
+          }, 2000);
+        }
+      }
+    }, 2000);
+  };
+
+  // Ajuda dos Universitários
+  const useUniversitiesHelp = async () => {
+    if (gameState.usedHelps.universities) return;
+    
+    audioService.playHelp();
+    setLoading(true);
+    
+    try {
+      const currentQ = gameState.questions[gameState.currentQuestion];
+      const prompt = `Como universitários especialistas em ISTQB, analisem esta pergunta e deem uma dica sobre qual seria a resposta mais provável, sem revelar diretamente a resposta:
+
+      Pergunta: ${currentQ.question}
+      A) ${currentQ.options[0]}
+      B) ${currentQ.options[1]} 
+      C) ${currentQ.options[2]}
+      D) ${currentQ.options[3]}
+      
+      Respondam como se fossem 3 universitários discutindo brevemente.`;
+
+      const response = await fetch(GEMINI_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      });
+
+      const data = await response.json();
+      const advice = data.candidates[0].content.parts[0].text;
+      
+      Alert.alert('💡 Ajuda dos Universitários', advice);
+      await accessibilityService.speak(`Ajuda dos Universitários: ${advice}`);
+      
+      setGameState(prev => ({
+        ...prev,
+        usedHelps: { ...prev.usedHelps, universities: true }
+      }));
+      
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível obter a ajuda dos universitários.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Eliminar 2 alternativas
+  const useEliminateHelp = () => {
+    if (gameState.usedHelps.eliminate) return;
+    
+    audioService.playHelp();
+    const currentQ = gameState.questions[gameState.currentQuestion];
+    const correctIndex = currentQ.correct;
+    
+    // Escolher 2 opções incorretas para eliminar
+    const incorrectOptions = [0, 1, 2, 3].filter(i => i !== correctIndex);
+    const toEliminate = incorrectOptions.slice(0, 2);
+    
+    setEliminatedOptions(toEliminate);
+    setGameState(prev => ({
+      ...prev,
+      usedHelps: { ...prev.usedHelps, eliminate: true }
+    }));
+    
+    accessibilityService.speak('Duas alternativas incorretas foram eliminadas.');
+  };
+
+  // Pular pergunta
+  const useSkipHelp = () => {
+    if (gameState.usedHelps.skip) return;
+    
+    audioService.playHelp();
+    
+    setGameState(prev => ({
+      ...prev,
+      currentQuestion: prev.currentQuestion + 1,
+      usedHelps: { ...prev.usedHelps, skip: true }
+    }));
+    
+    setSelectedAnswer(null);
+    setEliminatedOptions([]);
+    
+    accessibilityService.speak('Pergunta pulada. Próxima pergunta.');
+    
+    if (gameState.currentQuestion + 1 < gameState.questions.length) {
+      setTimeout(() => {
+        const nextQ = gameState.questions[gameState.currentQuestion + 1];
+        accessibilityService.readQuestion(nextQ, gameState.currentQuestion + 2);
+      }, 1000);
+    }
+  };
+
+  // Toggle de áudio
+  const toggleAudio = async () => {
+    const newState = !audioEnabled;
+    setAudioEnabled(newState);
+    audioService.setEnabled(newState);
+    await AsyncStorage.setItem('audioEnabled', JSON.stringify(newState));
+    
+    if (newState) {
+      audioService.playIntro();
+    }
+  };
+
+  // Toggle de acessibilidade
+  const toggleAccessibility = async () => {
+    const newState = !accessibilityEnabled;
+    setAccessibilityEnabled(newState);
+    accessibilityService.setEnabled(newState);
+    await AsyncStorage.setItem('accessibilityEnabled', JSON.stringify(newState));
+  };
+
+  // Renderização das telas
+  const renderLoginScreen = () => (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#1a237e" />
+      <View style={styles.loginContainer}>
+        <Text style={styles.title}>🏆 QA MILIONÁRIO</Text>
+        <Text style={styles.subtitle}>O Quiz Definitivo de QA</Text>
+        
+        <TouchableOpacity 
+          style={styles.loginButton}
+          onPress={() => {
+            setCurrentScreen('home');
+            audioService.playIntro();
+            accessibilityService.speak('Bem-vindo ao QA Milionário!');
+          }}
+        >
+          <Text style={styles.loginButtonText}>ENTRAR</Text>
+        </TouchableOpacity>
+        
+        <View style={styles.settingsContainer}>
+          <TouchableOpacity 
+            style={[styles.toggleButton, audioEnabled && styles.toggleButtonActive]}
+            onPress={toggleAudio}
+          >
+            <Text style={styles.toggleButtonText}>
+              🔊 Áudio: {audioEnabled ? 'ON' : 'OFF'}
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.toggleButton, accessibilityEnabled && styles.toggleButtonActive]}
+            onPress={toggleAccessibility}
+          >
+            <Text style={styles.toggleButtonText}>
+              ♿ Acessibilidade: {accessibilityEnabled ? 'ON' : 'OFF'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </SafeAreaView>
+  );
+
+  const renderHomeScreen = () => (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#1a237e" />
+      <View style={styles.homeContainer}>
+        <Text style={styles.title}>🏆 QA MILIONÁRIO</Text>
+        
+        <View style={styles.infoContainer}>
+          <Text style={styles.infoText}>• 20 Perguntas ISTQB CTFL</Text>
+          <Text style={styles.infoText}>• 3 Níveis de Dificuldade</Text>
+          <Text style={styles.infoText}>• 3 Vidas</Text>
+          <Text style={styles.infoText}>• 3 Ajudas Especiais</Text>
+          <Text style={styles.infoText}>• Pontuação Máxima: 44.000 pts</Text>
+        </View>
+        
+        <TouchableOpacity 
+          style={styles.playButton}
+          onPress={startNewGame}
+          disabled={loading}
+        >
+          <Text style={styles.playButtonText}>
+            {loading ? 'GERANDO PERGUNTAS...' : '🎯 JOGAR AGORA'}
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => setCurrentScreen('login')}
+        >
+          <Text style={styles.backButtonText}>← VOLTAR</Text>
+        </TouchableOpacity>
+      </View>
+      
+      {loading && (
+        <Modal transparent visible={loading}>
+          <View style={styles.loadingContainer}>
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="large" color="#ffd700" />
+              <Text style={styles.loadingText}>Gerando perguntas com IA...</Text>
+            </View>
+          </View>
+        </Modal>
+      )}
+    </SafeAreaView>
+  );
+
+  const renderGameScreen = () => {
+    if (gameState.questions.length === 0) return null;
+    
+    const currentQ = gameState.questions[gameState.currentQuestion];
+    const questionNumber = gameState.currentQuestion + 1;
+    const progress = (questionNumber / 20) * 100;
+    
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="light-content" backgroundColor="#1a237e" />
+        
+        {/* Header do Jogo */}
+        <View style={styles.gameHeader}>
+          <View style={styles.gameStats}>
+            <Text style={styles.statText}>💰 {gameState.score}</Text>
+            <Text style={styles.statText}>❤️ {gameState.lives}</Text>
+            <Text style={styles.statText}>{questionNumber}/20</Text>
+          </View>
+          
+          <View style={styles.progressBar}>
+            <View style={[styles.progressFill, { width: `${progress}%` }]} />
+          </View>
+        </View>
+        
+        {/* Pergunta */}
+        <ScrollView style={styles.gameContent}>
+          <View style={styles.questionContainer}>
+            <Text style={styles.questionNumber}>Pergunta {questionNumber}</Text>
+            <Text style={styles.questionText}>{currentQ.question}</Text>
+            <Text style={styles.questionPoints}>Vale: {currentQ.points} pontos</Text>
+          </View>
+          
+          {/* Opções */}
+          <View style={styles.optionsContainer}>
+            {currentQ.options.map((option, index) => {
+              const isEliminated = eliminatedOptions.includes(index);
+              const isSelected = selectedAnswer === index;
+              const isCorrect = selectedAnswer !== null && index === currentQ.correct;
+              const isWrong = selectedAnswer !== null && isSelected && index !== currentQ.correct;
+              
+              return (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.optionButton,
+                    isEliminated && styles.optionEliminated,
+                    isCorrect && styles.optionCorrect,
+                    isWrong && styles.optionWrong,
+                  ]}
+                  onPress={() => !isEliminated && answerQuestion(index)}
+                  disabled={selectedAnswer !== null || isEliminated}
+                >
+                  <Text style={[
+                    styles.optionText,
+                    isEliminated && styles.optionTextEliminated
+                  ]}>
+                    {option}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
+        
+        {/* Ajudas */}
+        <View style={styles.helpsContainer}>
+          <TouchableOpacity
+            style={[styles.helpButton, gameState.usedHelps.universities && styles.helpButtonUsed]}
+            onPress={useUniversitiesHelp}
+            disabled={gameState.usedHelps.universities || selectedAnswer !== null}
+          >
+            <Text style={styles.helpButtonText}>🎓 Universitários</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.helpButton, gameState.usedHelps.eliminate && styles.helpButtonUsed]}
+            onPress={useEliminateHelp}
+            disabled={gameState.usedHelps.eliminate || selectedAnswer !== null}
+          >
+            <Text style={styles.helpButtonText}>❌ Eliminar 2</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.helpButton, gameState.usedHelps.skip && styles.helpButtonUsed]}
+            onPress={useSkipHelp}
+            disabled={gameState.usedHelps.skip || selectedAnswer !== null}
+          >
+            <Text style={styles.helpButtonText}>⏭️ Pular</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  };
+
+  const renderResultScreen = () => (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor="#1a237e" />
+      <View style={styles.resultContainer}>
+        <Text style={styles.title}>🏆 RESULTADO FINAL</Text>
+        
+        <View style={styles.scoreContainer}>
+          <Text style={styles.finalScore}>{gameState.score}</Text>
+          <Text style={styles.scoreLabel}>PONTOS</Text>
+        </View>
+        
+        <View style={styles.statsContainer}>
+          <Text style={styles.statItem}>
+            Perguntas respondidas: {gameState.currentQuestion}/20
+          </Text>
+          <Text style={styles.statItem}>
+            Vidas restantes: {gameState.lives}
+          </Text>
+          <Text style={styles.statItem}>
+            Ajudas usadas: {Object.values(gameState.usedHelps).filter(Boolean).length}/3
+          </Text>
+        </View>
+        
+        <TouchableOpacity 
+          style={styles.playButton}
+          onPress={startNewGame}
+        >
+          <Text style={styles.playButtonText}>🎯 JOGAR NOVAMENTE</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.backButton}
+          onPress={() => setCurrentScreen('home')}
+        >
+          <Text style={styles.backButtonText}>← MENU PRINCIPAL</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+
+  // Renderização principal
+  switch (currentScreen) {
+    case 'login': return renderLoginScreen();
+    case 'home': return renderHomeScreen();
+    case 'game': return renderGameScreen();
+    case 'result': return renderResultScreen();
+    default: return renderLoginScreen();
+  }
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#1a237e',
+  },
+  loginContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#ffd700',
+    textAlign: 'center',
+    marginBottom: 10,
+    textShadowColor: '#000',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+  },
+  subtitle: {
+    fontSize: 18,
+    color: '#ffffff',
+    textAlign: 'center',
+    marginBottom: 40,
+  },
+  loginButton: {
+    backgroundColor: '#ffd700',
+    paddingHorizontal: 60,
+    paddingVertical: 15,
+    borderRadius: 25,
+    marginBottom: 30,
+  },
+  loginButtonText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1a237e',
+  },
+  settingsContainer: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  toggleButton: {
+    backgroundColor: '#333',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginVertical: 5,
+    minWidth: 200,
+  },
+  toggleButtonActive: {
+    backgroundColor: '#4caf50',
+  },
+  toggleButtonText: {
+    color: '#ffffff',
+    textAlign: 'center',
+    fontSize: 16,
+  },
+  homeContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  infoContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 20,
+    borderRadius: 15,
+    marginVertical: 30,
+    width: '100%',
+  },
+  infoText: {
+    color: '#ffffff',
+    fontSize: 16,
+    marginVertical: 3,
+    textAlign: 'center',
+  },
+  playButton: {
+    backgroundColor: '#4caf50',
+    paddingHorizontal: 40,
+    paddingVertical: 15,
+    borderRadius: 25,
+    marginVertical: 10,
+  },
+  playButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    textAlign: 'center',
+  },
+  backButton: {
+    backgroundColor: 'transparent',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#ffffff',
+    marginVertical: 10,
+  },
+  backButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingBox: {
+    backgroundColor: '#1a237e',
+    padding: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#ffffff',
+    fontSize: 16,
+    marginTop: 15,
+  },
+  gameHeader: {
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    padding: 15,
+  },
+  gameStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  statText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 3,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#ffd700',
+    borderRadius: 3,
+  },
+  gameContent: {
+    flex: 1,
+    padding: 20,
+  },
+  questionContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 20,
+    borderRadius: 15,
+    marginBottom: 20,
+  },
+  questionNumber: {
+    color: '#ffd700',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  questionText: {
+    color: '#ffffff',
+    fontSize: 18,
+    lineHeight: 26,
+    marginBottom: 10,
+  },
+  questionPoints: {
+    color: '#4caf50',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  optionsContainer: {
+    marginBottom: 20,
+  },
+  optionButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 15,
+    borderRadius: 10,
+    marginVertical: 5,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  optionEliminated: {
+    backgroundColor: 'rgba(255, 0, 0, 0.2)',
+    opacity: 0.5,
+  },
+  optionCorrect: {
+    backgroundColor: 'rgba(76, 175, 80, 0.3)',
+    borderColor: '#4caf50',
+  },
+  optionWrong: {
+    backgroundColor: 'rgba(244, 67, 54, 0.3)',
+    borderColor: '#f44336',
+  },
+  optionText: {
+    color: '#ffffff',
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  optionTextEliminated: {
+    textDecorationLine: 'line-through',
+    color: '#999',
+  },
+  helpsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    padding: 15,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+  },
+  helpButton: {
+    backgroundColor: '#ff9800',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 20,
+    flex: 1,
+    marginHorizontal: 5,
+  },
+  helpButtonUsed: {
+    backgroundColor: '#666',
+    opacity: 0.5,
+  },
+  helpButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  resultContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  scoreContainer: {
+    alignItems: 'center',
+    marginVertical: 30,
+  },
+  finalScore: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#ffd700',
+    textShadowColor: '#000',
+    textShadowOffset: { width: 2, height: 2 },
+    textShadowRadius: 4,
+  },
+  scoreLabel: {
+    fontSize: 20,
+    color: '#ffffff',
+    marginTop: 5,
+  },
+  statsContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    padding: 20,
+    borderRadius: 15,
+    marginBottom: 30,
+    width: '100%',
+  },
+  statItem: {
+    color: '#ffffff',
+    fontSize: 16,
+    textAlign: 'center',
+    marginVertical: 3,
+  },
+});
+
+export default App; 

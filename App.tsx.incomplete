@@ -1,0 +1,761 @@
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  Alert,
+  ScrollView,
+  SafeAreaView,
+  StatusBar,
+  Dimensions,
+  Modal,
+  ActivityIndicator,
+  Platform,
+  TextInput,
+  ImageBackground,
+  FlatList,
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Animatable from 'react-native-animatable';
+
+// Importação condicional do TTS
+let Tts: any = null;
+if (Platform.OS !== 'web') {
+  try {
+    Tts = require('react-native-tts');
+  } catch (e) {
+    console.log('TTS não disponível nesta plataforma');
+  }
+}
+
+const { width, height } = Dimensions.get('window');
+
+// API Gemini
+const GEMINI_API_KEY = 'AIzaSyCCc8BY7EYXxY9MTAC_ZikFwdbjiw6Q8ZE';
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`;
+
+// Tipos
+interface Question {
+  id: number;
+  question: string;
+  options: string[];
+  correct: number;
+  difficulty: 'easy' | 'medium' | 'hard';
+  points: number;
+}
+
+interface GameState {
+  currentQuestion: number;
+  score: number;
+  lives: number;
+  questions: Question[];
+  usedHelps: {
+    universities: boolean;
+    eliminate: boolean;
+    skip: boolean;
+    quit: boolean;
+  };
+  gameStarted: boolean;
+  gameFinished: boolean;
+  playerName: string;
+}
+
+interface RankingEntry {
+  id: string;
+  name: string;
+  score: number;
+  date: string;
+  questions: number;
+}
+
+// Serviço de Áudio Melhorado
+class AudioService {
+  private static instance: AudioService;
+  private audioEnabled: boolean = true;
+  private audioContext: any = null;
+
+  static getInstance(): AudioService {
+    if (!AudioService.instance) {
+      AudioService.instance = new AudioService();
+    }
+    return AudioService.instance;
+  }
+
+  async initialize() {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      try {
+        // @ts-ignore
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      } catch (e) {
+        console.log('AudioContext não disponível');
+      }
+    }
+  }
+
+  setEnabled(enabled: boolean) {
+    this.audioEnabled = enabled;
+  }
+
+  isEnabled(): boolean {
+    return this.audioEnabled;
+  }
+
+  // Som Show do Milhão - Efeitos com Web Audio API
+  private playTone(frequency: number, duration: number, type: 'sine' | 'square' | 'triangle' = 'sine') {
+    if (!this.audioEnabled || Platform.OS !== 'web' || !this.audioContext) {
+      console.log(`🎵 Som: ${frequency}Hz por ${duration}ms`);
+      return;
+    }
+
+    try {
+      const oscillator = this.audioContext.createOscillator();
+      const gainNode = this.audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(this.audioContext.destination);
+      
+      oscillator.frequency.value = frequency;
+      oscillator.type = type;
+      
+      gainNode.gain.setValueAtTime(0.3, this.audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, this.audioContext.currentTime + duration / 1000);
+      
+      oscillator.start(this.audioContext.currentTime);
+      oscillator.stop(this.audioContext.currentTime + duration / 1000);
+    } catch (e) {
+      console.log('Erro ao reproduzir som:', e);
+    }
+  }
+
+  playIntro() {
+    if (!this.audioEnabled) return;
+    // Melodia dramática do Show do Milhão
+    setTimeout(() => this.playTone(523, 200), 0);    // C5
+    setTimeout(() => this.playTone(659, 200), 250);  // E5
+    setTimeout(() => this.playTone(784, 400), 500);  // G5
+    setTimeout(() => this.playTone(1047, 600), 1000); // C6
+  }
+
+  playCorrect() {
+    if (!this.audioEnabled) return;
+    // Som de acerto crescente
+    setTimeout(() => this.playTone(440, 150), 0);
+    setTimeout(() => this.playTone(554, 150), 200);
+    setTimeout(() => this.playTone(659, 300), 400);
+  }
+
+  playWrong() {
+    if (!this.audioEnabled) return;
+    // Som dramático de erro
+    this.playTone(196, 800, 'square');
+  }
+
+  playLevelUp() {
+    if (!this.audioEnabled) return;
+    // Fanfarra de vitória
+    setTimeout(() => this.playTone(523, 100), 0);
+    setTimeout(() => this.playTone(659, 100), 150);
+    setTimeout(() => this.playTone(784, 100), 300);
+    setTimeout(() => this.playTone(1047, 200), 450);
+  }
+
+  playVictory() {
+    if (!this.audioEnabled) return;
+    // Tema de vitória completa
+    const melody = [523, 659, 784, 1047, 1319, 1568, 2093];
+    melody.forEach((freq, index) => {
+      setTimeout(() => this.playTone(freq, 300), index * 150);
+    });
+  }
+
+  playGameOver() {
+    if (!this.audioEnabled) return;
+    // Som descendente dramático
+    setTimeout(() => this.playTone(440, 200), 0);
+    setTimeout(() => this.playTone(369, 200), 250);
+    setTimeout(() => this.playTone(311, 200), 500);
+    setTimeout(() => this.playTone(261, 500), 750);
+  }
+
+  playHelp() {
+    if (!this.audioEnabled) return;
+    this.playTone(800, 200);
+  }
+
+  playSuspense() {
+    if (!this.audioEnabled) return;
+    // Batimento crescente
+    for (let i = 0; i < 3; i++) {
+      setTimeout(() => this.playTone(220, 100, 'triangle'), i * 300);
+    }
+  }
+
+  playClick() {
+    if (!this.audioEnabled) return;
+    this.playTone(1000, 50);
+  }
+}
+
+// Serviço de Acessibilidade Completo
+class AccessibilityService {
+  private static instance: AccessibilityService;
+  private ttsEnabled: boolean = false;
+
+  static getInstance(): AccessibilityService {
+    if (!AccessibilityService.instance) {
+      AccessibilityService.instance = new AccessibilityService();
+    }
+    return AccessibilityService.instance;
+  }
+
+  async initialize() {
+    try {
+      if (Tts && Platform.OS !== 'web') {
+        await Tts.setDefaultLanguage('pt-BR');
+        await Tts.setDefaultRate(0.7);
+        await Tts.setDefaultPitch(1.0);
+      }
+    } catch (error) {
+      console.log('TTS não disponível:', error);
+    }
+  }
+
+  setEnabled(enabled: boolean) {
+    this.ttsEnabled = enabled;
+    if (enabled) {
+      this.speak('Acessibilidade ativada. O QA Milionário lerá todas as informações para você.');
+    }
+  }
+
+  isEnabled(): boolean {
+    return this.ttsEnabled;
+  }
+
+  async speak(text: string) {
+    if (!this.ttsEnabled) return;
+    
+    try {
+      if (Platform.OS === 'web') {
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+          window.speechSynthesis.cancel(); // Para fala anterior
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = 'pt-BR';
+          utterance.rate = 0.8;
+          utterance.pitch = 1.0;
+          window.speechSynthesis.speak(utterance);
+        }
+      } else if (Tts) {
+        await Tts.speak(text);
+      }
+    } catch (error) {
+      console.log('Erro no TTS:', error);
+    }
+  }
+
+  async readQuestion(question: Question, questionNumber: number) {
+    if (!this.ttsEnabled) return;
+    
+    const text = `Pergunta ${questionNumber} de 20. Vale ${question.points} pontos. ${question.question}. 
+    As opções são: ${question.options.join('. ')}.`;
+    
+    await this.speak(text);
+  }
+
+  async readResult(isCorrect: boolean, score: number, lives: number) {
+    if (!this.ttsEnabled) return;
+    
+    const text = isCorrect 
+      ? `Parabéns! Resposta correta! Sua pontuação atual é ${score} pontos. Você tem ${lives} vidas restantes.`
+      : `Que pena! Resposta incorreta. Sua pontuação atual é ${score} pontos. Você tem ${lives} vidas restantes.`;
+    
+    await this.speak(text);
+  }
+
+  async readGameStats(score: number, lives: number, question: number) {
+    if (!this.ttsEnabled) return;
+    await this.speak(`Status do jogo: Pergunta ${question} de 20. Pontuação: ${score} pontos. Vidas: ${lives}.`);
+  }
+
+  async readRanking(rankings: RankingEntry[]) {
+    if (!this.ttsEnabled) return;
+    
+    let text = "Ranking dos melhores jogadores: ";
+    rankings.slice(0, 5).forEach((entry, index) => {
+      text += `${index + 1}º lugar: ${entry.name} com ${entry.score} pontos. `;
+    });
+    
+    await this.speak(text);
+  }
+}
+
+export default function App() {
+  // Estados principais
+  const [currentScreen, setCurrentScreen] = useState<'splash' | 'login' | 'home' | 'game' | 'result' | 'ranking'>('splash');
+  const [playerName, setPlayerName] = useState('');
+  const [gameState, setGameState] = useState<GameState>({
+    currentQuestion: 0,
+    score: 0,
+    lives: 3,
+    questions: [],
+    usedHelps: { universities: false, eliminate: false, skip: false, quit: false },
+    gameStarted: false,
+    gameFinished: false,
+    playerName: '',
+  });
+  
+  // Estados de controle
+  const [loading, setLoading] = useState(false);
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
+  const [eliminatedOptions, setEliminatedOptions] = useState<number[]>([]);
+  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [accessibilityEnabled, setAccessibilityEnabled] = useState(false);
+  const [ranking, setRanking] = useState<RankingEntry[]>([]);
+  const [showModal, setShowModal] = useState<'help' | 'quit' | null>(null);
+
+  // Serviços
+  const audioService = useRef(AudioService.getInstance()).current;
+  const accessibilityService = useRef(AccessibilityService.getInstance()).current;
+
+  // Inicialização
+  useEffect(() => {
+    initializeApp();
+  }, []);
+
+  const initializeApp = async () => {
+    await audioService.initialize();
+    await accessibilityService.initialize();
+    await loadUserData();
+    await loadRanking();
+    
+    // Splash screen por 3 segundos
+    setTimeout(() => {
+      setCurrentScreen('login');
+      audioService.playIntro();
+    }, 3000);
+    
+    // BackHandler apenas para Android
+    if (Platform.OS === 'android') {
+      const { BackHandler } = require('react-native');
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
+      return () => backHandler.remove();
+    }
+  };
+
+  const loadUserData = async () => {
+    try {
+      const name = await AsyncStorage.getItem('playerName');
+      const audioSetting = await AsyncStorage.getItem('audioEnabled');
+      const accessibilitySetting = await AsyncStorage.getItem('accessibilityEnabled');
+      
+      if (name) setPlayerName(name);
+      if (audioSetting !== null) {
+        const enabled = JSON.parse(audioSetting);
+        setAudioEnabled(enabled);
+        audioService.setEnabled(enabled);
+      }
+      if (accessibilitySetting !== null) {
+        const enabled = JSON.parse(accessibilitySetting);
+        setAccessibilityEnabled(enabled);
+        accessibilityService.setEnabled(enabled);
+      }
+    } catch (error) {
+      console.log('Erro ao carregar dados:', error);
+    }
+  };
+
+  const loadRanking = async () => {
+    try {
+      const rankingData = await AsyncStorage.getItem('ranking');
+      if (rankingData) {
+        const rankings = JSON.parse(rankingData);
+        setRanking(rankings.sort((a: RankingEntry, b: RankingEntry) => b.score - a.score));
+      }
+    } catch (error) {
+      console.log('Erro ao carregar ranking:', error);
+    }
+  };
+
+  const saveToRanking = async (score: number, questions: number) => {
+    try {
+      const newEntry: RankingEntry = {
+        id: Date.now().toString(),
+        name: playerName || 'Anônimo',
+        score,
+        date: new Date().toLocaleDateString('pt-BR'),
+        questions,
+      };
+      
+      const updatedRanking = [...ranking, newEntry]
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 20); // Top 20
+      
+      setRanking(updatedRanking);
+      await AsyncStorage.setItem('ranking', JSON.stringify(updatedRanking));
+    } catch (error) {
+      console.log('Erro ao salvar ranking:', error);
+    }
+  };
+
+  const handleBackPress = () => {
+    if (currentScreen === 'game') {
+      setShowModal('quit');
+      return true;
+    } else if (currentScreen === 'result' || currentScreen === 'ranking') {
+      setCurrentScreen('home');
+      return true;
+    }
+    return false;
+  };
+
+  // Geração de perguntas com IA
+  const generateQuestions = async (): Promise<Question[]> => {
+    setLoading(true);
+    
+    try {
+      const prompt = `Gere exatamente 20 perguntas sobre ISTQB CTFL (Certified Tester Foundation Level) em português brasileiro.
+      
+      Distribua as perguntas nos seguintes valores de pontuação:
+      - Perguntas 1-5: 1000 pontos cada (fáceis)
+      - Perguntas 6-10: 2000 pontos cada (médias)
+      - Perguntas 11-15: 4000 pontos cada (médias-difíceis)
+      - Perguntas 16-20: 8000 pontos cada (difíceis)
+      
+      Formato JSON EXATO:
+      {
+        "questions": [
+          {
+            "question": "Pergunta aqui?",
+            "options": ["A) primeira opção", "B) segunda opção", "C) terceira opção", "D) quarta opção"],
+            "correct": 0,
+            "difficulty": "easy",
+            "points": 1000
+          }
+        ]
+      }
+      
+      IMPORTANTE:
+      - Perguntas devem cobrir: Fundamentos de teste, Processo de teste, Técnicas de teste, Gerenciamento de teste, Ferramentas
+      - Opções sempre começam com A), B), C), D)
+      - Campo "correct" indica o índice da resposta correta (0-3)
+      - Mantenha as perguntas profissionais e técnicas`;
+
+      const response = await fetch(GEMINI_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      });
+
+      if (!response.ok) throw new Error('Erro na API');
+      
+      const data = await response.json();
+      const content = data.candidates[0].content.parts[0].text;
+      
+      // Extrair JSON do conteúdo
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('Formato de resposta inválido');
+      
+      const questionsData = JSON.parse(jsonMatch[0]);
+      
+      return questionsData.questions.map((q: any, index: number) => ({
+        id: index + 1,
+        question: q.question,
+        options: q.options,
+        correct: q.correct,
+        difficulty: q.difficulty,
+        points: q.points
+      }));
+      
+    } catch (error) {
+      console.error('Erro ao gerar perguntas:', error);
+      
+      // Perguntas de fallback detalhadas
+      return [
+        {
+          id: 1,
+          question: "Qual é o principal objetivo do teste de software?",
+          options: ["A) Encontrar todos os defeitos", "B) Provar que o software funciona", "C) Avaliar e reduzir riscos", "D) Documentar o código"],
+          correct: 2,
+          difficulty: 'easy' as const,
+          points: 1000
+        },
+        {
+          id: 2,
+          question: "O que é um caso de teste?",
+          options: ["A) Um erro no software", "B) Uma especificação de entrada, ação e resultado esperado", "C) Um tipo de defeito", "D) Uma ferramenta de teste"],
+          correct: 1,
+          difficulty: 'easy' as const,
+          points: 1000
+        },
+        // ... mais perguntas de fallback
+      ];
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Controles do jogo
+  const startNewGame = async () => {
+    if (!playerName.trim()) {
+      Alert.alert('Nome Obrigatório', 'Por favor, digite seu nome antes de começar.');
+      return;
+    }
+
+    audioService.playIntro();
+    await accessibilityService.speak(`${playerName}, iniciando novo jogo do QA Milionário! Boa sorte!`);
+    
+    const questions = await generateQuestions();
+    
+    setGameState({
+      currentQuestion: 0,
+      score: 0,
+      lives: 3,
+      questions,
+      usedHelps: { universities: false, eliminate: false, skip: false, quit: false },
+      gameStarted: true,
+      gameFinished: false,
+      playerName,
+    });
+    
+    setSelectedAnswer(null);
+    setEliminatedOptions([]);
+    setCurrentScreen('game');
+    
+    // Ler primeira pergunta após delay
+    if (questions.length > 0) {
+      setTimeout(() => {
+        accessibilityService.readQuestion(questions[0], 1);
+      }, 2000);
+    }
+  };
+
+  const answerQuestion = async (selectedIndex: number) => {
+    if (selectedAnswer !== null) return;
+    
+    audioService.playClick();
+    setSelectedAnswer(selectedIndex);
+    audioService.playSuspense();
+    
+    const currentQ = gameState.questions[gameState.currentQuestion];
+    const isCorrect = selectedIndex === currentQ.correct;
+    
+    setTimeout(async () => {
+      if (isCorrect) {
+        audioService.playCorrect();
+        const newScore = gameState.score + currentQ.points;
+        
+        setGameState(prev => ({
+          ...prev,
+          score: newScore,
+          currentQuestion: prev.currentQuestion + 1
+        }));
+        
+        await accessibilityService.readResult(true, newScore, gameState.lives);
+        
+        if (gameState.currentQuestion + 1 >= gameState.questions.length) {
+          // Jogo completo
+          audioService.playVictory();
+          await accessibilityService.speak(`Parabéns ${playerName}! Você completou o QA Milionário com ${newScore} pontos! Você é um verdadeiro especialista em QA!`);
+          
+          await saveToRanking(newScore, gameState.currentQuestion + 1);
+          setGameState(prev => ({ ...prev, gameFinished: true }));
+          setCurrentScreen('result');
+        } else {
+          // Próxima pergunta
+          audioService.playLevelUp();
+          setTimeout(() => {
+            setSelectedAnswer(null);
+            setEliminatedOptions([]);
+            const nextQ = gameState.questions[gameState.currentQuestion + 1];
+            accessibilityService.readQuestion(nextQ, gameState.currentQuestion + 2);
+          }, 3000);
+        }
+      } else {
+        audioService.playWrong();
+        const newLives = gameState.lives - 1;
+        
+        setGameState(prev => ({
+          ...prev,
+          lives: newLives
+        }));
+        
+        await accessibilityService.readResult(false, gameState.score, newLives);
+        
+        if (newLives <= 0) {
+          // Game Over
+          audioService.playGameOver();
+          await accessibilityService.speak(`Game Over ${playerName}! Você fez ${gameState.score} pontos em ${gameState.currentQuestion + 1} perguntas.`);
+          
+          await saveToRanking(gameState.score, gameState.currentQuestion + 1);
+          setGameState(prev => ({ ...prev, gameFinished: true }));
+          setCurrentScreen('result');
+        } else {
+          // Continua jogando
+          setTimeout(() => {
+            setSelectedAnswer(null);
+            setEliminatedOptions([]);
+            const nextQ = gameState.questions[gameState.currentQuestion + 1];
+            accessibilityService.readQuestion(nextQ, gameState.currentQuestion + 2);
+          }, 3000);
+        }
+      }
+    }, 2000);
+  };
+
+  // Sistema de ajudas
+  const useUniversitiesHelp = async () => {
+    if (gameState.usedHelps.universities) return;
+    
+    audioService.playHelp();
+    setGameState(prev => ({
+      ...prev,
+      usedHelps: { ...prev.usedHelps, universities: true }
+    }));
+
+    setLoading(true);
+    
+    try {
+      const currentQ = gameState.questions[gameState.currentQuestion];
+      const prompt = `Como universitários especialistas em QA e ISTQB, analisem esta pergunta e deem uma dica útil SEM revelar a resposta diretamente:
+
+Pergunta: ${currentQ.question}
+
+Opções:
+${currentQ.options.join('\n')}
+
+Forneçam uma dica educativa que ajude a raciocinar sobre a resposta correta, explicando conceitos relevantes do ISTQB CTFL.`;
+
+      const response = await fetch(GEMINI_API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      });
+
+      const data = await response.json();
+      const helpText = data.candidates[0].content.parts[0].text;
+
+      Alert.alert(
+        '🎓 Ajuda dos Universitários',
+        helpText,
+        [{ text: 'Entendi!', onPress: () => accessibilityService.speak(helpText) }]
+      );
+      
+      await accessibilityService.speak(`Ajuda dos universitários: ${helpText}`);
+      
+    } catch (error) {
+      Alert.alert(
+        '🎓 Ajuda dos Universitários',
+        'Os universitários sugerem: Lembre-se dos princípios fundamentais do ISTQB. Pense na definição e objetivo principal do conceito perguntado.',
+        [{ text: 'Entendi!' }]
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const useEliminateHelp = () => {
+    if (gameState.usedHelps.eliminate || eliminatedOptions.length > 0) return;
+    
+    audioService.playHelp();
+    setGameState(prev => ({
+      ...prev,
+      usedHelps: { ...prev.usedHelps, eliminate: true }
+    }));
+
+    const currentQ = gameState.questions[gameState.currentQuestion];
+    const wrongOptions = [0, 1, 2, 3].filter(i => i !== currentQ.correct);
+    const toEliminate = wrongOptions.sort(() => Math.random() - 0.5).slice(0, 2);
+    
+    setEliminatedOptions(toEliminate);
+    accessibilityService.speak('Duas opções incorretas foram eliminadas.');
+  };
+
+  const useSkipHelp = () => {
+    if (gameState.usedHelps.skip) return;
+    
+    audioService.playHelp();
+    setGameState(prev => ({
+      ...prev,
+      usedHelps: { ...prev.usedHelps, skip: true },
+      currentQuestion: prev.currentQuestion + 1
+    }));
+
+    setSelectedAnswer(null);
+    setEliminatedOptions([]);
+    
+    if (gameState.currentQuestion + 1 >= gameState.questions.length) {
+      // Última pergunta pulada
+      audioService.playVictory();
+      saveToRanking(gameState.score, gameState.currentQuestion + 1);
+      setGameState(prev => ({ ...prev, gameFinished: true }));
+      setCurrentScreen('result');
+    } else {
+      const nextQ = gameState.questions[gameState.currentQuestion + 1];
+      accessibilityService.speak('Pergunta pulada. Próxima pergunta:');
+      setTimeout(() => {
+        accessibilityService.readQuestion(nextQ, gameState.currentQuestion + 2);
+      }, 1000);
+    }
+  };
+
+  const quitGame = () => {
+    audioService.playClick();
+    Alert.alert(
+      'Desistir do Jogo?',
+      'Tem certeza que deseja desistir? Você receberá os pontos acumulados até agora.',
+      [
+        { text: 'Continuar Jogando', style: 'cancel' },
+        { 
+          text: 'Desistir', 
+          onPress: async () => {
+            setGameState(prev => ({
+              ...prev,
+              usedHelps: { ...prev.usedHelps, quit: true },
+              gameFinished: true
+            }));
+            
+            await saveToRanking(gameState.score, gameState.currentQuestion);
+            setCurrentScreen('result');
+            accessibilityService.speak(`Você desistiu com ${gameState.score} pontos.`);
+          }
+        }
+      ]
+    );
+  };
+
+  // Controles de configuração
+  const toggleAudio = async () => {
+    const newState = !audioEnabled;
+    setAudioEnabled(newState);
+    audioService.setEnabled(newState);
+    await AsyncStorage.setItem('audioEnabled', JSON.stringify(newState));
+    
+    if (newState) {
+      audioService.playClick();
+      accessibilityService.speak('Áudio ativado');
+    }
+  };
+
+  const toggleAccessibility = async () => {
+    const newState = !accessibilityEnabled;
+    setAccessibilityEnabled(newState);
+    accessibilityService.setEnabled(newState);
+    await AsyncStorage.setItem('accessibilityEnabled', JSON.stringify(newState));
+    
+    if (newState) {
+      await accessibilityService.speak('Acessibilidade ativada. Todas as informações serão lidas em voz alta.');
+    }
+  };
+
+  const savePlayerName = async (name: string) => {
+    setPlayerName(name);
+    await AsyncStorage.setItem('playerName', name);
+  };
+
+  // Continue with render methods...
+} 

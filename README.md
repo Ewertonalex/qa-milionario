@@ -6,7 +6,7 @@
 
 **O quiz definitivo para profissionais de QA inspirado no Show do Milhão!**
 
-[![Versão](https://img.shields.io/badge/versão-1.0.2-blue.svg)](https://github.com/Ewertonalex/qa-milionario/releases)
+[![Versão](https://img.shields.io/badge/versão-1.0.3-blue.svg)](https://github.com/Ewertonalex/qa-milionario/releases)
 [![Plataforma](https://img.shields.io/badge/plataforma-Mac%20%7C%20Windows-green.svg)](#downloads)
 [![Licença](https://img.shields.io/badge/licença-MIT-yellow.svg)](LICENSE)
 [![ISTQB](https://img.shields.io/badge/ISTQB-CTFL-red.svg)](https://www.istqb.org/)
@@ -16,6 +16,8 @@
 ## 🎯 **Sobre o Projeto**
 
 O **QA Milionário** é um jogo educativo inspirado no clássico **Show do Milhão** da TV brasileira, especialmente desenvolvido para profissionais de Quality Assurance (QA). 
+
+> **🆕 Versão 1.0.3** - Corrigido bug onde a resposta correta aparecia destacada antes da seleção do usuário!
 
 ### 📺 **Como o Show do Milhão**
 - 🎪 **20 perguntas** progressivas com dificuldade crescente
@@ -33,14 +35,14 @@ O **QA Milionário** é um jogo educativo inspirado no clássico **Show do Milh�
 ## 📥 **Downloads**
 
 ### 🍎 **macOS (Intel)**
-[![Download para Mac](https://img.shields.io/badge/Download-macOS%20Intel-blue?style=for-the-badge&logo=apple)](https://github.com/Ewertonalex/qa-milionario/releases/download/v1.0.2/QA.Milionario-1.0.2.dmg)
+[![Download para Mac](https://img.shields.io/badge/Download-macOS%20Intel-blue?style=for-the-badge&logo=apple)](https://github.com/Ewertonalex/qa-milionario/releases/download/v1.0.3/QA-Milionario-1.0.3.dmg)
 
-**Tamanho:** 169MB | **Compatibilidade:** macOS 10.15+
+**Tamanho:** 177MB | **Compatibilidade:** macOS 10.15+
 
 ### 🪟 **Windows**
-[![Download para Windows](https://img.shields.io/badge/Download-Windows%20x64-blue?style=for-the-badge&logo=windows)](https://github.com/Ewertonalex/qa-milionario/releases/download/v1.0.2/QA.Milionario.Setup.1.0.2.exe)
+[![Download para Windows](https://img.shields.io/badge/Download-Windows%20x64-blue?style=for-the-badge&logo=windows)](https://github.com/Ewertonalex/qa-milionario/releases/download/v1.0.3/QA-Milionario-Setup-1.0.3.exe)
 
-**Tamanho:** 293MB | **Compatibilidade:** Windows 10+
+**Tamanho:** 305MB | **Compatibilidade:** Windows 10+
 
 ---
 
@@ -73,7 +75,7 @@ O **QA Milionário** é um jogo educativo inspirado no clássico **Show do Milh�
 ## 🚀 **Instalação**
 
 ### **macOS**
-1. Baixe o arquivo `QA Milionário-1.0.2.dmg`
+1. Baixe o arquivo `QA Milionário-1.0.3.dmg`
 2. Duplo clique no arquivo baixado
 3. Arraste o app para a pasta **Applications**
 4. Execute o comando de segurança:
@@ -82,7 +84,7 @@ sudo xattr -rd com.apple.quarantine "/Applications/QA Milionário.app"
 ```
 
 ### **Windows**
-1. Baixe o arquivo `QA Milionário Setup 1.0.2.exe`
+1. Baixe o arquivo `QA Milionário Setup 1.0.3.exe`
 2. Execute o instalador como administrador
 3. Siga as instruções de instalação
 4. Inicie o jogo pelo menu Iniciar
@@ -138,6 +140,18 @@ Contribuições são bem-vindas! Para contribuir:
 3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
 4. Push para a branch (`git push origin feature/AmazingFeature`)
 5. Abra um Pull Request
+
+## 📝 **Changelog**
+
+### **v1.0.3** (Atual)
+- 🐛 **Correção crítica:** Resolvido bug onde a resposta correta aparecia destacada em verde antes do usuário selecionar
+- ✅ **Melhoria:** Cores das opções agora só aparecem APÓS confirmação da resposta
+- 🎯 **Gameplay:** Experiência mais justa e desafiadora
+
+### **v1.0.2**
+- ✅ Primeira versão estável com todas as funcionalidades
+- ✅ Compatibilidade completa com Mac Intel e Windows
+- ✅ Sistema completo de ajudas e ranking
 
 ## 📝 **Roadmap**
 

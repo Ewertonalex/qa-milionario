@@ -1352,7 +1352,8 @@ Distribua: 8 fáceis (1000pts), 8 médias (2000pts), 4 difíceis (5000pts).`;
             {currentQ.options.map((option, index) => {
               const isEliminated = eliminatedOptions.includes(index);
               const isSelected = selectedAnswer === index;
-              const isCorrect = selectedAnswer !== null && index === currentQ.correct;
+              // Só mostrar cores APÓS uma resposta ser selecionada E confirmada
+              const isCorrect = selectedAnswer !== null && isSelected && index === currentQ.correct;
               const isWrong = selectedAnswer !== null && isSelected && index !== currentQ.correct;
               
               return (
