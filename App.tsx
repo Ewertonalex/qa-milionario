@@ -981,21 +981,51 @@ Distribua: 8 fáceis (1000pts), 8 médias (2000pts), 4 difíceis (5000pts).`;
       C) ${currentQ.options[2]}
       D) ${currentQ.options[3]}
       
-      Respondam como se fossem 3 universitários discutindo brevemente.`;
+      Respondam como se fossem 3 universitários discutindo brevemente. Máximo 150 palavras.`;
 
       console.log('📤 Enviando pergunta para IA...');
+      
+      const requestBody = {
+        contents: [{
+          parts: [{
+            text: prompt
+          }]
+        }],
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 200,
+        }
+      };
+
       const response = await fetch(GEMINI_API_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
       });
 
+      console.log('📡 Status da resposta:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Erro da API:', errorText);
+        throw new Error(`API Error: ${response.status}`);
+      }
+
       const data = await response.json();
-      const advice = data.candidates[0].content.parts[0].text;
+      console.log('📥 Resposta da API:', JSON.stringify(data, null, 2));
       
-      console.log('📥 Resposta recebida:', advice.substring(0, 100) + '...');
+      if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+        console.error('❌ Estrutura de resposta inválida:', data);
+        throw new Error('Resposta da IA inválida');
+      }
+      
+      const advice = data.candidates[0].content.parts[0].text;
+      console.log('📝 Conselho extraído:', advice.substring(0, 100) + '...');
       
       setTimeout(() => {
         showModal('💡 Ajuda dos Universitários', advice, [
@@ -1016,9 +1046,23 @@ Distribua: 8 fáceis (1000pts), 8 médias (2000pts), 4 difíceis (5000pts).`;
       }));
       
     } catch (error) {
-      console.error('❌ Erro na ajuda:', error);
+      console.error('❌ Erro na ajuda dos universitários:', error);
+      
+      // Fallback com dicas genéricas baseadas na pergunta
+      const currentQ = gameState.questions[gameState.currentQuestion];
+      const fallbackAdvices = [
+        "👨‍🎓 Universitário 1: 'Lembre-se dos conceitos fundamentais do ISTQB. A resposta geralmente está relacionada às boas práticas de teste.'\n\n👩‍🎓 Universitária 2: 'Considere o contexto da pergunta e elimine as opções que claramente não fazem sentido.'\n\n👨‍🎓 Universitário 3: 'Pense na aplicação prática - qual resposta faria mais sentido em um projeto real?'",
+        
+        "👩‍🎓 Universitária 1: 'Esta pergunta parece ser sobre processo de teste. Lembre-se da sequência lógica das atividades.'\n\n👨‍🎓 Universitário 2: 'Considere os níveis de teste e quando cada um é aplicado.'\n\n👩‍🎓 Universitária 3: 'A resposta correta geralmente segue as definições padrão do ISTQB.'",
+        
+        "👨‍🎓 Universitário 1: 'Analise cada opção cuidadosamente. No ISTQB, a terminologia é muito específica.'\n\n👩‍🎓 Universitária 2: 'Pense na diferença entre conceitos similares - isso é comum nas perguntas.'\n\n👨‍🎓 Universitário 3: 'Quando em dúvida, escolha a opção mais abrangente e completa.'"
+      ];
+      
+      const randomAdvice = fallbackAdvices[Math.floor(Math.random() * fallbackAdvices.length)];
+      
       setTimeout(() => {
-        showModal('Erro', 'Não foi possível obter a ajuda dos universitários.', [
+        showModal('💡 Ajuda dos Universitários', 
+          `⚠️ Conexão com IA indisponível. Aqui está uma dica geral:\n\n${randomAdvice}`, [
           { 
             text: 'OK', 
             onPress: () => {
@@ -1027,7 +1071,14 @@ Distribua: 8 fáceis (1000pts), 8 médias (2000pts), 4 difíceis (5000pts).`;
             }
           }
         ]);
+        accessibilityService.speak(`Ajuda dos universitários: ${randomAdvice}`);
       }, 100);
+      
+      setGameState(prev => ({
+        ...prev,
+        usedHelps: { ...prev.usedHelps, universities: true }
+      }));
+      
     } finally {
       setLoading(false);
     }
