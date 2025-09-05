@@ -28,9 +28,80 @@ if (Platform.OS !== 'web') {
 
 const { width, height } = Dimensions.get('window');
 
-// Configuração da API Gemini
-const GEMINI_API_KEY = 'AIzaSyCCc8BY7EYXxY9MTAC_ZikFwdbjiw6Q8ZE';
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${GEMINI_API_KEY}`;
+// Configuração da API Gemini com múltiplas chaves para rotação
+const GEMINI_API_KEYS = [
+  'AIzaSyCCc8BY7EYXxY9MTAC_ZikFwdbjiw6Q8ZE', // Chave principal
+  
+  // 🔑 ADICIONE SUAS OUTRAS CHAVES AQUI:
+  // Descomente e adicione suas chaves backup:
+  // 'AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', // Chave backup 1
+  // 'AIzaSyYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY', // Chave backup 2  
+  // 'AIzaSyZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ', // Chave backup 3
+  // 'AIzaSyWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW', // Chave backup 4
+  
+  // Quanto mais chaves, mais confiável será o sistema!
+];
+
+const getGeminiApiUrl = (keyIndex: number = 0) => {
+  const apiKey = GEMINI_API_KEYS[keyIndex] || GEMINI_API_KEYS[0];
+  return `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+};
+
+// Função para tentar múltiplas API keys
+const tryMultipleApiKeys = async (requestBody: any, operation: string = 'API call'): Promise<any> => {
+  let lastError = null;
+  
+  for (let keyIndex = 0; keyIndex < GEMINI_API_KEYS.length; keyIndex++) {
+    const apiUrl = getGeminiApiUrl(keyIndex);
+    const keyName = keyIndex === 0 ? 'principal' : `backup ${keyIndex}`;
+    
+    console.log(`🔑 Tentando ${operation} com chave ${keyName} (${keyIndex + 1}/${GEMINI_API_KEYS.length})`);
+    
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+      console.log(`📡 Status da resposta (chave ${keyName}):`, response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`❌ Erro da API (chave ${keyName}):`, errorText);
+        
+        if (response.status === 429) {
+          console.warn(`⚠️ Limite atingido na chave ${keyName}, tentando próxima...`);
+          lastError = new Error('RATE_LIMIT_EXCEEDED');
+          continue; // Tenta próxima chave
+        } else {
+          throw new Error(`API_ERROR_${response.status}`);
+        }
+      }
+
+      // Sucesso! Retorna os dados
+      const data = await response.json();
+      console.log(`✅ Sucesso com chave ${keyName}!`);
+      return data;
+      
+    } catch (error) {
+      console.error(`❌ Erro com chave ${keyName}:`, error.message);
+      lastError = error;
+      
+      // Se não for erro 429, não tenta outras chaves
+      if (error.message !== 'RATE_LIMIT_EXCEEDED') {
+        throw error;
+      }
+    }
+  }
+  
+  // Se chegou aqui, todas as chaves falharam
+  console.error('❌ Todas as API keys falharam');
+  throw lastError || new Error('ALL_KEYS_FAILED');
+};
 
 // Tipos
 interface Question {
@@ -485,26 +556,9 @@ Retorne APENAS o JSON válido:
         ]
       };
 
-      console.log('📤 Enviando requisição para Gemini...');
+      console.log('📤 Enviando requisição para Gemini com rotação de chaves...');
       
-      const response = await fetch(GEMINI_API_URL, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      console.log('📡 Status da resposta:', response.status, response.statusText);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Erro da API:', errorText);
-        throw new Error(`Erro HTTP ${response.status}: ${errorText}`);
-      }
-
-      const data = await response.json();
+      const data = await tryMultipleApiKeys(requestBody, 'geração de perguntas');
       console.log('📥 Resposta da IA recebida:', JSON.stringify(data, null, 2).substring(0, 500) + '...');
       
       if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
@@ -555,10 +609,15 @@ Retorne APENAS o JSON válido:
       
     } catch (error) {
       console.error('❌ Erro ao gerar perguntas com IA:', error);
-      console.warn('⚠️ Tentando novamente com prompt simplificado...');
       
-      // Segunda tentativa com prompt mais simples
-      try {
+      // Se for erro 429, pular tentativa e ir direto para fallback
+      if (error.message === 'RATE_LIMIT_EXCEEDED') {
+        console.warn('⚠️ Limite de API atingido - usando banco local de perguntas');
+      } else {
+        console.warn('⚠️ Tentando novamente com prompt simplificado...');
+        
+        // Segunda tentativa com prompt mais simples
+        try {
         const simplePrompt = `Crie 20 perguntas de QA/Teste de software em português brasileiro no formato JSON:
 
 {
@@ -575,7 +634,7 @@ Retorne APENAS o JSON válido:
 
 Distribua: 8 fáceis (1000pts), 8 médias (2000pts), 4 difíceis (5000pts).`;
 
-        const simpleResponse = await fetch(GEMINI_API_URL, {
+        const simpleResponse = await fetch(getGeminiApiUrl(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -607,12 +666,13 @@ Distribua: 8 fáceis (1000pts), 8 médias (2000pts), 4 difíceis (5000pts).`;
       } catch (retryError) {
         console.error('❌ Segunda tentativa também falhou:', retryError);
       }
+      } // Fechando o else
       
-      console.warn('⚠️ Usando banco de perguntas de emergência (será embaralhado)');
+      console.warn('🔄 Usando banco de perguntas local (garantia de funcionamento)');
       
-      // Banco de perguntas de fallback mais extenso e variado
+      // Banco de perguntas de fallback extenso e variado - ISTQB CTFL
       const fallbackQuestions = [
-        // FÁCEIS (1000 pontos)
+        // FÁCEIS (1000 pontos) - 8 perguntas
         {
           id: 1,
           question: "O que é teste de software segundo o ISTQB?",
@@ -678,7 +738,7 @@ Distribua: 8 fáceis (1000pts), 8 médias (2000pts), 4 difíceis (5000pts).`;
           points: 1000
         },
 
-        // MÉDIAS (2000 pontos)
+        // MÉDIAS (2000 pontos) - 8 perguntas
         {
           id: 9,
           question: "Qual técnica é exemplo de caixa-preta?",
@@ -744,7 +804,7 @@ Distribua: 8 fáceis (1000pts), 8 médias (2000pts), 4 difíceis (5000pts).`;
           points: 2000
         },
 
-        // DIFÍCEIS (5000 pontos)
+        // DIFÍCEIS (5000 pontos) - 4 perguntas
         {
           id: 17,
           question: "Na técnica de teste de transição de estados, o que é um estado inválido?",
@@ -983,7 +1043,7 @@ Distribua: 8 fáceis (1000pts), 8 médias (2000pts), 4 difíceis (5000pts).`;
       
       Respondam como se fossem 3 universitários discutindo brevemente. Máximo 150 palavras.`;
 
-      console.log('📤 Enviando pergunta para IA...');
+      console.log('📤 Enviando pergunta para IA com rotação de chaves...');
       
       const requestBody = {
         contents: [{
@@ -999,32 +1059,27 @@ Distribua: 8 fáceis (1000pts), 8 médias (2000pts), 4 difíceis (5000pts).`;
         }
       };
 
-      const response = await fetch(GEMINI_API_URL, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      console.log('📡 Status da resposta:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Erro da API:', errorText);
-        throw new Error(`API Error: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await tryMultipleApiKeys(requestBody, 'ajuda dos universitários');
       console.log('📥 Resposta da API:', JSON.stringify(data, null, 2));
       
-      if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
-        console.error('❌ Estrutura de resposta inválida:', data);
-        throw new Error('Resposta da IA inválida');
+      // Verificação mais robusta da estrutura da resposta
+      if (!data || !data.candidates || !Array.isArray(data.candidates) || data.candidates.length === 0) {
+        console.error('❌ Sem candidates na resposta:', data);
+        throw new Error('NO_CANDIDATES');
       }
       
-      const advice = data.candidates[0].content.parts[0].text;
+      const candidate = data.candidates[0];
+      if (!candidate || !candidate.content || !candidate.content.parts || !Array.isArray(candidate.content.parts) || candidate.content.parts.length === 0) {
+        console.error('❌ Estrutura de candidate inválida:', candidate);
+        throw new Error('INVALID_CANDIDATE_STRUCTURE');
+      }
+      
+      const advice = candidate.content.parts[0].text;
+      if (!advice || advice.trim().length === 0) {
+        console.error('❌ Texto vazio na resposta');
+        throw new Error('EMPTY_RESPONSE');
+      }
+      
       console.log('📝 Conselho extraído:', advice.substring(0, 100) + '...');
       
       setTimeout(() => {
@@ -1048,23 +1103,37 @@ Distribua: 8 fáceis (1000pts), 8 médias (2000pts), 4 difíceis (5000pts).`;
     } catch (error) {
       console.error('❌ Erro na ajuda dos universitários:', error);
       
-      // Fallback com dicas genéricas baseadas na pergunta
+      // Mensagens específicas baseadas no tipo de erro
+      let errorTitle = '💡 Ajuda dos Universitários';
+      let errorMessage = '';
+      
+      if (error.message === 'RATE_LIMIT_EXCEEDED') {
+        errorTitle = '⏰ Limite de Uso Atingido';
+        errorMessage = `🚫 A IA atingiu o limite de consultas por hoje.\n\nMas não se preocupe! Aqui está uma dica dos nossos especialistas:\n\n`;
+      } else if (error.message === 'API_KEY_INVALID') {
+        errorTitle = '🔑 Problema de Configuração';
+        errorMessage = `⚙️ Problema temporário na conexão com a IA.\n\nEnquanto isso, nossos especialistas recomendam:\n\n`;
+      } else {
+        errorTitle = '💡 Ajuda dos Universitários';
+        errorMessage = `🌐 IA temporariamente indisponível.\n\nAqui está uma dica valiosa:\n\n`;
+      }
+      
+      // Fallback com dicas genéricas inteligentes baseadas na pergunta
       const currentQ = gameState.questions[gameState.currentQuestion];
       const fallbackAdvices = [
-        "👨‍🎓 Universitário 1: 'Lembre-se dos conceitos fundamentais do ISTQB. A resposta geralmente está relacionada às boas práticas de teste.'\n\n👩‍🎓 Universitária 2: 'Considere o contexto da pergunta e elimine as opções que claramente não fazem sentido.'\n\n👨‍🎓 Universitário 3: 'Pense na aplicação prática - qual resposta faria mais sentido em um projeto real?'",
+        "👨‍🎓 **Prof. Silva (ISTQB Expert):** 'Lembre-se dos conceitos fundamentais do ISTQB. A resposta geralmente está relacionada às boas práticas de teste.'\n\n👩‍🎓 **Dra. Santos:** 'Considere o contexto da pergunta e elimine as opções que claramente não fazem sentido.'\n\n👨‍🎓 **Prof. Costa:** 'Pense na aplicação prática - qual resposta faria mais sentido em um projeto real?'",
         
-        "👩‍🎓 Universitária 1: 'Esta pergunta parece ser sobre processo de teste. Lembre-se da sequência lógica das atividades.'\n\n👨‍🎓 Universitário 2: 'Considere os níveis de teste e quando cada um é aplicado.'\n\n👩‍🎓 Universitária 3: 'A resposta correta geralmente segue as definições padrão do ISTQB.'",
+        "👩‍🎓 **Dra. Oliveira:** 'Esta pergunta parece ser sobre processo de teste. Lembre-se da sequência lógica das atividades.'\n\n👨‍🎓 **Prof. Lima:** 'Considere os níveis de teste e quando cada um é aplicado no ciclo de desenvolvimento.'\n\n👩‍🎓 **Dra. Ferreira:** 'A resposta correta geralmente segue as definições padrão do ISTQB. Confie nos conceitos básicos!'",
         
-        "👨‍🎓 Universitário 1: 'Analise cada opção cuidadosamente. No ISTQB, a terminologia é muito específica.'\n\n👩‍🎓 Universitária 2: 'Pense na diferença entre conceitos similares - isso é comum nas perguntas.'\n\n👨‍🎓 Universitário 3: 'Quando em dúvida, escolha a opção mais abrangente e completa.'"
+        "👨‍🎓 **Prof. Martins:** 'Analise cada opção cuidadosamente. No ISTQB, a terminologia é muito específica e precisa.'\n\n👩‍🎓 **Dra. Rocha:** 'Pense na diferença entre conceitos similares - isso é muito comum nas certificações.'\n\n👨‍🎓 **Prof. Alves:** 'Quando em dúvida, escolha a opção mais abrangente e que segue as melhores práticas.'"
       ];
       
       const randomAdvice = fallbackAdvices[Math.floor(Math.random() * fallbackAdvices.length)];
       
       setTimeout(() => {
-        showModal('💡 Ajuda dos Universitários', 
-          `⚠️ Conexão com IA indisponível. Aqui está uma dica geral:\n\n${randomAdvice}`, [
+        showModal(errorTitle, errorMessage + randomAdvice, [
           { 
-            text: 'OK', 
+            text: 'Entendi', 
             onPress: () => {
               hideModal();
               audioService.playClick();
