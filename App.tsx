@@ -32,15 +32,19 @@ const { width, height } = Dimensions.get('window');
 const GEMINI_API_KEYS = [
   'AIzaSyCCc8BY7EYXxY9MTAC_ZikFwdbjiw6Q8ZE', // Chave principal
   
-  // 🔑 ADICIONE SUAS OUTRAS CHAVES AQUI:
-  // Descomente e adicione suas chaves backup:
-  // 'AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX', // Chave backup 1
-  // 'AIzaSyYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYYY', // Chave backup 2  
-  // 'AIzaSyZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ', // Chave backup 3
-  // 'AIzaSyWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW', // Chave backup 4
+  // 🔑 CHAVES BACKUP (adicione suas outras chaves aqui):
+  // Exemplo de como adicionar mais chaves:
+  // 'AIzaSyD1234567890ABCDEFGHIJKLMNOPQRSTUV', // Chave backup 1
+  // 'AIzaSyE1234567890ABCDEFGHIJKLMNOPQRSTUV', // Chave backup 2
+  // 'AIzaSyF1234567890ABCDEFGHIJKLMNOPQRSTUV', // Chave backup 3
+  // 'AIzaSyG1234567890ABCDEFGHIJKLMNOPQRSTUV', // Chave backup 4
   
+  // ⚠️ IMPORTANTE: Adicione suas chaves reais aqui para evitar erro 429!
   // Quanto mais chaves, mais confiável será o sistema!
 ];
+
+// Flag para usar banco local como prioridade (temporário enquanto API está com limite)
+const USE_LOCAL_QUESTIONS_FIRST = true;
 
 const getGeminiApiUrl = (keyIndex: number = 0) => {
   const apiKey = GEMINI_API_KEYS[keyIndex] || GEMINI_API_KEYS[0];
@@ -497,6 +501,12 @@ const App: React.FC = () => {
   const generateQuestions = async (): Promise<Question[]> => {
     setLoading(true);
     
+    // Se a flag estiver ativa, usar banco local diretamente (evita erro 429)
+    if (USE_LOCAL_QUESTIONS_FIRST) {
+      console.log('🎯 Usando banco local de perguntas (modo prioritário ativo)');
+      return getFallbackQuestions();
+    }
+    
     try {
       const prompt = `Gere EXATAMENTE 20 perguntas diferentes e aleatórias sobre ISTQB CTFL (Certified Tester Foundation Level) em português brasileiro.
 
@@ -670,8 +680,16 @@ Distribua: 8 fáceis (1000pts), 8 médias (2000pts), 4 difíceis (5000pts).`;
       
       console.warn('🔄 Usando banco de perguntas local (garantia de funcionamento)');
       
-      // Banco de perguntas de fallback extenso e variado - ISTQB CTFL
-      const fallbackQuestions = [
+      return getFallbackQuestions();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Função para retornar banco de perguntas local
+  const getFallbackQuestions = (): Question[] => {
+    // Banco de perguntas de fallback extenso e variado - ISTQB CTFL
+    const fallbackQuestions = [
         // FÁCEIS (1000 pontos) - 8 perguntas
         {
           id: 1,
@@ -842,11 +860,8 @@ Distribua: 8 fáceis (1000pts), 8 médias (2000pts), 4 difíceis (5000pts).`;
       // Embaralhar as perguntas para maior variação
       const shuffled = [...fallbackQuestions].sort(() => Math.random() - 0.5);
       
-      console.log('🔄 Usando banco de perguntas de fallback (20 perguntas variadas)');
+      console.log('🔄 Usando banco de perguntas local (20 perguntas ISTQB variadas)');
       return shuffled;
-    } finally {
-      setLoading(false);
-    }
   };
 
   // Função para embaralhar array
