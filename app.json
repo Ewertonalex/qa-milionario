@@ -34,7 +34,16 @@
       "display": "standalone",
       "orientation": "portrait",
       "startUrl": "/",
-      "preferRelatedApplications": false
+      "preferRelatedApplications": false,
+      "build": {
+        "babel": {
+          "include": [
+            "web.js",
+            "index.js",
+            "App.tsx"
+          ]
+        }
+      }
     }
   }
 }

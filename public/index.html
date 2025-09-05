@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+    <title>QA Milionário - Quiz de QA</title>
+    
+    <meta name="description" content="QA Milionário - O quiz definitivo para profissionais de QA inspirado no Show do Milhão!" />
+    <meta name="keywords" content="QA, Quality Assurance, ISTQB, Quiz, Teste de Software, Show do Milhão" />
+    <meta name="author" content="Ewerton Alexandre" />
+    
+    <meta name="theme-color" content="#1a237e" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        html, body {
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #1a237e 0%, #3f51b5 100%);
+            color: white;
+            overflow: hidden;
+        }
+        
+        #root {
+            display: flex;
+            height: 100%;
+            flex: 1;
+        }
+        
+        .loading {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            text-align: center;
+        }
+        
+        .loading h1 {
+            font-size: 2.5rem;
+            color: #ffd700;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        .loading p {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 215, 0, 0.3);
+            border-top: 4px solid #ffd700;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            background: #f44336;
+            color: white;
+            padding: 1rem;
+            margin: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="root">
+        <div class="loading">
+            <h1>🏆 QA MILIONÁRIO</h1>
+            <p>Carregando o quiz de QA...</p>
+            <div class="spinner"></div>
+        </div>
+    </div>
+    
+    <script>
+        // Verificar se React Native Web está disponível
+        if (typeof window !== 'undefined') {
+            // Simular um app básico se o bundle principal falhar
+            setTimeout(() => {
+                const root = document.getElementById('root');
+                if (root && root.innerHTML.includes('loading')) {
+                    root.innerHTML = `
+                        <div class="error">
+                            <h2>⚠️ Erro de Carregamento</h2>
+                            <p>O QA Milionário está sendo atualizado.</p>
+                            <p>Tente recarregar a página em alguns minutos.</p>
+                            <button onclick="window.location.reload()" style="
+                                background: #4CAF50;
+                                color: white;
+                                border: none;
+                                padding: 12px 24px;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-size: 16px;
+                                margin-top: 1rem;
+                            ">
+                                🔄 Recarregar
+                            </button>
+                        </div>
+                    `;
+                }
+            }, 10000); // 10 segundos timeout
+        }
+    </script>
+</body>
+</html>
